@@ -1,0 +1,111 @@
+function g=cacode_irnss(prn_id,fs,band)
+
+% function G=CACODE(SV,FS) 
+% Generates 1023 length C/A Codes for GPS PRNs 1-37
+%
+% 
+% g: nx1023 matrix- with each PRN in each row with symbols 1 and 0
+% sv: a row or column vector of the SV's to be generated
+% 	 valid entries are 1 to 37
+% fs: optional number of samples per chip (defaults to 1), fractional samples allowed, must be 1 or greater.
+%
+% For multiple samples per chip, function is a zero order hold. 
+%
+%
+% For example to generate the C/A codes for PRN 6 and PRN 12 use:
+% g=cacode([6 12]),
+% and to generate the C/A codes for PRN 6 and PRN 12 at 5 MHz use
+% g=cacode([6 12],5/1.023)
+% 
+%
+% For more information refer to the "GPS SPS Signal Specification"
+% http://www.navcen.uscg.gov/pubs/gps/sigspec/default.htm
+%
+% Dan Boschen 12-30-2007
+% boschen@loglin.com
+% **Edited by Chirag C. Shetty (IIT Bombay) for IRNSS CA codes -18th Nov-2016
+
+if nargin<2
+	fs=1;
+end
+
+if (max(prn_id)>7) || (min(prn_id)<1) || (min(size(prn_id))~=1)
+	error('sv must be a row or column vector with integers between 1 and 37\n')
+end
+
+if (band~='s'&& band~='l')
+	error('Band should either be l or s for IRNSS. Please correct.')
+end
+
+if fs<1
+	error('fs must be 1 or greater\n')
+end	
+
+% force integers
+testint=round(prn_id)-prn_id;
+if testint ~= 0 
+	warning('non-integer value entered for sv, rounding to closest integer\n');
+	prn_id = round(prn_id);
+end
+
+%Register initializations for satellites and band (Source: IRNSS ICD)
+
+l_band_g2 = [
+             1 1 1 0 1 0 0 1 1 1;     %55 E
+             0 0 0 0 1 0 0 1 1 0;     %55 E
+             1 0 0 0 1 1 0 1 0 0;     %83 E
+             0 1 0 1 1 1 0 0 1 0;     %111.75 E
+             1 1 1 0 1 1 0 0 0 0;     %111.75 E
+             0 0 0 1 1 0 1 0 1 1;     %32.5 E
+             0 0 0 0 0 1 0 1 0 0      %131.5 E
+             ];
+s_band_g2 = [ 
+             0 0 1 1 1 0 1 1 1 1;
+             0 1 0 1 1 1 1 1 0 1;
+             1 0 0 0 1 1 0 0 0 1;
+             0 0 1 0 1 0 1 0 1 1;
+             1 0 1 0 0 1 0 0 0 1;
+             0 1 0 0 1 0 1 1 0 0;
+             0 0 1 0 0 0 1 1 1 0
+             ];
+
+% G1 LFSR: x^10+x^3+1
+s=[0 0 1 0 0 0 0 0 0 1];
+n=length(s);
+g1=ones(1,n);	%initialization vector for G1
+L=2^n-1;
+
+% G2j LFSR: x^10+x^9+x^8+x^6+x^3+x^2+1
+t=[0 1 1 0 0 1 0 1 1 1];
+
+if band=='s'
+    q = s_band_g2(prn_id,:);
+elseif band=='l'
+    q = l_band_g2(prn_id,:);
+end
+
+q = fliplr(q);
+
+% generate C/A Code sequences:
+tap_sel=n;
+for inc=1:L
+    g2(:,inc)=q(n);
+    g(:,inc)=mod(g1(n)+g2(:,inc),2);
+   g1=[mod(sum(g1.*s),2) g1(1:n-1)];
+   q=[mod(sum(q.*t),2) q(1:n-1)];
+end
+
+%upsample to desired rate
+if fs~=1
+	%fractional upsampling with zero order hold
+	index=0;
+	for cnt = 1/fs:1/fs:L
+		index=index+1;
+		if ceil(cnt) > L   %traps a floating point error in index
+			gfs(:,index)=g(:,L);
+		else
+			gfs(:,index)=g(:,ceil(cnt));
+		end
+	end 
+	g=gfs;
+end
