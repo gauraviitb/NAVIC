@@ -133,3 +133,5 @@ if fs~=1
 	end 
 	g=gfs;
 end
+
+g = 2.*g - 1 ;
