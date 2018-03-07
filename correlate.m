@@ -6,8 +6,8 @@ j = 0;
 L = size(in_phase);%
 for V = 1: L
 
-i = i + circshift(in_phase, V) * incoming' ;
-j = j + circshift(Q_comp, V) * incoming' ;
+i = i + circshift(in_phase, [V, 0]) * incoming' ;
+j = j + circshift(Q_comp, [V, 0]) * incoming' ;
 
 end
 acq_mat_ele = i*i + j*j ;
